@@ -87,7 +87,7 @@ def main():
         result = parser.parse_catalog('https://www.maxidom.ru/catalog/zapchasti-dlya-sadovoy-tehniki/')
 
     pprint(result)
-    print(len(result))
+    print(f'Количество товаров: {len(result)}')
 
 
 if __name__ == '__main__':
