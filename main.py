@@ -14,6 +14,7 @@ class Product:
     price: int
 
 
+# Класс Parser представляет собой парсер для извлечения данных из каталога на сайте maxidom.ru.
 class Parser:
 
     def __init__(self):
@@ -29,6 +30,15 @@ class Parser:
         self.close()
 
     def __parse_page(self, slug: str, page: int, amount: int = 30) -> tuple[bool, list[Product]]:
+        """
+        Парсинг страницы каталога и извлечение данных о товарах
+
+        :param slug: Уникальный идентификатор сегмента каталога
+        :param page: Номер страницы
+        :param amount: Количество товаров на странице
+        :return: Список товаров страницы
+        """
+
         response = self.__session.get(f'https://www.maxidom.ru/catalog/{slug}/?amount={amount}&PAGEN_2={page}')
 
         if response.status_code != 200:
@@ -56,6 +66,13 @@ class Parser:
         return not soup.find('a', {'id': 'navigation_2_next_page'}), page_data
 
     def parse_catalog(self, url: str) -> list[Product]:
+        """
+        Парсинг каталога и извлечение данных о всех товарах в данном сегменте каталога
+
+        :param url: Ссылка на сегмент каталога
+        :return: Список товаров сегмента каталога
+        """
+
         if not self.__session:
             self.__session = Session()
 
