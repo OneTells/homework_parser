@@ -1,23 +1,35 @@
 import re
+from dataclasses import dataclass
+from pprint import pprint
 from typing import Self
 
 from bs4 import BeautifulSoup
 from requests import Session
 
 
+@dataclass(frozen=True, slots=True)
+class Product:
+    name: str
+    url: str
+    price: int
+
+
 class Parser:
 
     def __init__(self):
-        self.session: Session | None = None
+        self.__session: Session | None = None
+
+    def close(self):
+        self.__session.close()
 
     def __enter__(self) -> Self:
         return self
 
     def __exit__(self, *args):
-        self.session.close()
+        self.close()
 
-    def __parse_page(self, slug: str, page: int, amount: int = 30) -> tuple[bool, dict[str, int]]:
-        response = self.session.get(f'https://www.maxidom.ru/catalog/{slug}/?amount={amount}&PAGEN_2={page}')
+    def __parse_page(self, slug: str, page: int, amount: int = 30) -> tuple[bool, list[Product]]:
+        response = self.__session.get(f'https://www.maxidom.ru/catalog/{slug}/?amount={amount}&PAGEN_2={page}')
 
         if response.status_code != 200:
             raise ValueError('Ошибка при запросе каталога. Повторите попытку')
@@ -32,21 +44,22 @@ class Parser:
             .find_all('article', {'class': 'l-product l-product__horizontal'})
         )
 
-        page_data: dict[str, int] = {}
+        page_data: list[Product] = []
 
         for element in elements:
-            name = element.find('span', {'itemprop': 'name'}).text.capitalize()
+            name = element.find('span', {'itemprop': 'name'}).text
+            product_path = element.find('a', {'itemprop': 'url'}).get('href')
             price = int(element.find('span', {'itemprop': 'price'}).text)
 
-            page_data |= {name: price}
+            page_data.append(Product(name, f'https://www.maxidom.ru{product_path}', price))
 
         return not soup.find('a', {'id': 'navigation_2_next_page'}), page_data
 
-    def parse_catalog(self, url: str) -> dict[str, int]:
-        if not self.session:
-            self.session = Session()
+    def parse_catalog(self, url: str) -> list[Product]:
+        if not self.__session:
+            self.__session = Session()
 
-        match = re.fullmatch(r'^https://www\.maxidom\.ru/catalog/([^/]+)', url)
+        match = re.fullmatch(r'^https://www\.maxidom\.ru/catalog/([^/]+)/?', url)
 
         if not match:
             raise ValueError('Ссылка некорректна')
@@ -54,14 +67,12 @@ class Parser:
         slug = match.group(1)
 
         current_page = 1
-        catalog_data: dict[str, int] = {}
-
-        self.session = Session()
+        catalog_data: list[Product] = []
 
         while True:
             is_last_page, page_data = self.__parse_page(slug, current_page)
 
-            catalog_data |= page_data
+            catalog_data += page_data
 
             if is_last_page:
                 break
@@ -73,9 +84,9 @@ class Parser:
 
 def main():
     with Parser() as parser:
-        result = parser.parse_catalog('https://www.maxidom.ru/catalog/sadovaya-tehnika')
+        result = parser.parse_catalog('https://www.maxidom.ru/catalog/zapchasti-dlya-sadovoy-tehniki/')
 
-    print(result)
+    pprint(result)
     print(len(result))
 
 
