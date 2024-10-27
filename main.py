@@ -1,16 +1,83 @@
-# This is a sample Python script.
+import re
+from typing import Self
 
-# Press Shift+F10 to execute it or replace it with your code.
-# Press Double Shift to search everywhere for classes, files, tool windows, actions, and settings.
-
-
-def print_hi(name):
-    # Use a breakpoint in the code line below to debug your script.
-    print(f'Hi, {name}')  # Press Ctrl+F8 to toggle the breakpoint.
+from bs4 import BeautifulSoup
+from requests import Session
 
 
-# Press the green button in the gutter to run the script.
+class Parser:
+
+    def __init__(self):
+        self.session: Session | None = None
+
+    def __enter__(self) -> Self:
+        return self
+
+    def __exit__(self, *args):
+        self.session.close()
+
+    def __parse_page(self, slug: str, page: int, amount: int = 30) -> tuple[bool, dict[str, int]]:
+        response = self.session.get(f'https://www.maxidom.ru/catalog/{slug}/?amount={amount}&PAGEN_2={page}')
+
+        if response.status_code != 200:
+            raise ValueError('Ошибка при запросе каталога. Повторите попытку')
+
+        content = response.content
+
+        soup = BeautifulSoup(content.decode(), 'html.parser')
+
+        elements = (
+            soup
+            .find('div', {'class': 'lvl1__product-body lvl2 hidden lvl1__product-body-searchresult'})
+            .find_all('article', {'class': 'l-product l-product__horizontal'})
+        )
+
+        page_data: dict[str, int] = {}
+
+        for element in elements:
+            name = element.find('span', {'itemprop': 'name'}).text.capitalize()
+            price = int(element.find('span', {'itemprop': 'price'}).text)
+
+            page_data |= {name: price}
+
+        return not soup.find('a', {'id': 'navigation_2_next_page'}), page_data
+
+    def parse_catalog(self, url: str) -> dict[str, int]:
+        if not self.session:
+            self.session = Session()
+
+        match = re.fullmatch(r'^https://www\.maxidom\.ru/catalog/([^/]+)', url)
+
+        if not match:
+            raise ValueError('Ссылка некорректна')
+
+        slug = match.group(1)
+
+        current_page = 1
+        catalog_data: dict[str, int] = {}
+
+        self.session = Session()
+
+        while True:
+            is_last_page, page_data = self.__parse_page(slug, current_page)
+
+            catalog_data |= page_data
+
+            if is_last_page:
+                break
+
+            current_page += 1
+
+        return catalog_data
+
+
+def main():
+    with Parser() as parser:
+        result = parser.parse_catalog('https://www.maxidom.ru/catalog/sadovaya-tehnika')
+
+    print(result)
+    print(len(result))
+
+
 if __name__ == '__main__':
-    print_hi('PyCharm')
-
-# See PyCharm help at https://www.jetbrains.com/help/pycharm/
+    main()
