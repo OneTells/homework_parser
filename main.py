@@ -84,7 +84,7 @@ class Parser:
 
 def main():
     with Parser() as parser:
-        result = parser.parse_catalog('https://www.maxidom.ru/catalog/zapchasti-dlya-sadovoy-tehniki/')
+        result = parser.parse_catalog('https://www.maxidom.ru/catalog/tovary-dlya-poliva/')
 
     pprint(result)
     print(f'Количество товаров: {len(result)}')
